@@ -1,3 +1,13 @@
+/*+−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
+| UNIFAL − UNIVERSIDADE FEDERAL DE ALFENAS
+| BACHARELADO EM CIENCIA DA COMPUTACAO.
+| Trabalho..: PARTE 1 - Construção Arvore Sintatica e PARTE 2 - Geração de codigo MIPS a partir da AS
+| Disciplina: Compiladores
+| Professor.: Luiz Eduardo da Silva
+| Aluno.....: Luis Gustavo de Souza Carvalho
+| Data......: 08/01/2019
++−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−*/
+
 ptno criaNo(int tipo, char *valor){
 	ptno n = (ptno) malloc (sizeof(struct no));
     n->tipo = tipo;
@@ -10,7 +20,7 @@ ptno criaNo(int tipo, char *valor){
 
 ptpi pilha = NULL;
 FILE *arq;
-int cons = 0;
+int cons = 0; //Variável que irá manipular os _const
 
 void adicionaFilho(ptno pai, ptno filho){
 	if(filho){
@@ -53,6 +63,7 @@ void mostra(ptno raiz, int nivel){
 	}
 }
 
+//Adiciona um nó na pilha
 void push(ptno pt){
 	if(pilha == NULL){
 		pilha = (ptpi)malloc(sizeof(struct pi));
@@ -67,6 +78,7 @@ void push(ptno pt){
 	pilha = aux;
 }
 
+//Retira um nó da pilha
 ptno pop(){
 	if(pilha == NULL){
 		return NULL;
@@ -79,7 +91,7 @@ ptno pop(){
 	return retorno;
 }
 
-
+//Verifica se a pilha ta vazia
 int vazia(){
 	if(pilha == NULL){
 		return 1;
@@ -88,16 +100,7 @@ int vazia(){
 	}
 }
 
-void mostrapilha(){
-	
-	ptpi aux = pilha;
-	while(aux != NULL){
-		printf("[%s]\n", aux->no->valor);
-		aux = aux->prox;
-	}
-	
-}
-
+//Tabela de tokens para a geração do .dot
 char * tabelaToken(int token){
 	switch(token){
 		case T_PROGRAMA: return "Programa"; break;
@@ -131,6 +134,7 @@ char * tabelaToken(int token){
 	}
 }
 
+//Faz uma recursão para verificar todos os textos na árvore
 void verificaConstantes(){
 	ptno atual = pop();
 	if(atual->tipo == T_TEXTO){
@@ -151,6 +155,7 @@ void verificaConstantes(){
 	}
 }
 
+//Verifica e declara as variáveis presentes no nó Declaração
 void verificaVariaveis(){
 	ptno atual = pop();
 	ptno aux = atual->filho;
@@ -169,15 +174,15 @@ void verificaVariaveis(){
 	}
 }
 
+//Gera o código mips por meio de recursao
 void geraCod(ptno p){
 	if(p == NULL) return;
 	ptno p1, p2, p3;
-	switch(p->tipo){
-		
-		case T_PROGRAMA:{	
+	switch(p->tipo){ 
+		case T_PROGRAMA:{
+			//Cria o cabeçalho do mips com a declaração de constantes e variáveis
 			p1 = p->filho;
 			p2 = p1->irmao;
-			p3 = p2->irmao;
 			printf(".data");
 			push(p1);
 			verificaConstantes();
@@ -186,60 +191,57 @@ void geraCod(ptno p){
 			printf("\n.text");
 			printf("\n\t.globl main");
 			printf("\nmain:\tnop");
+			//Terminado o cabeçalho, começa a gerar o codigo da lista de comandos
 			geraCod(p1);
 			printf("\nfim:\tnop");
 			break;
 		}
 		case T_LISTACOMANDOS:{
+			//Caso seja uma lista de comandos, ele apenas gera o codigo dos filhos
 			p1 = p->filho;
 			p2 = p1->irmao;
 			if(p2 != NULL) geraCod(p2);
 			geraCod(p1);
 		}
 		case T_ESCREVA:{
+			//Escreve o código mips referente ao ESCR de acordo com o que será escrito
 			p1 = p->filho;
 			if(p1->tipo == T_TEXTO)
 				printf("\n\tla $a0, %s\n\tli $v0, 4\n\tsyscall", p1->valor);
 			else if(p1->tipo == T_NUMERO) 
 				printf("\n\tla $a0, %s\n\tli $v0, 1\n\tsyscall", p1->valor);
 			else if(p1->tipo == T_VARIAVEL){
+				//Caso seja uma variável, ele gera o cod da mesma pra que ocorra o seu carregamento
 				geraCod(p1);
 				printf("\n\tli $v0, 1\n\tsyscall");
 			}
 			break;
 		}
 		case T_LEIA:{
+			//Código mips referente ao LEIA
 			printf("\n\tli $v0, 5\n\tsyscall\n\tsw $v0, %s", p->filho->valor);
 			break;
 		}
 		case T_ENQTO:{
+			//Codigo mips referente ao NADA
 			printf("\nL%d:\tnop", ++ROTULO);
-			//pushrot(rot);
 			empilha(ROTULO);
 			p1 = p->filho;//faca
 			p2 = p1->irmao;//condicao
 			geraCod(p2);			
+			//Código mips referente ao DSVF
 			printf("\n\tbeqz $a0, L%d", ++ROTULO);
-			//pushrot(rot);
 			empilha(ROTULO);
 			geraCod(p1);
 			int aux = desempilha();
+			//Código mips referente ao DSVS
 			printf("\n\tj L%d", desempilha());
+			//Código mips referente ao NADA
 			printf("\nL%d:\tnop", aux);
 			break;
 		}
-		case T_FACA:{
-			p1 = p->filho;
-			geraCod(p1);
-			//printf("\nbeqz $a0, L%d", ++rot);
-			break;
-		}
-		case T_FIMENQTO:{
-			int auxrot = desempilha();
-			printf("\n\tj L%d\nL%d:\tnop", desempilha(), auxrot);
-			break;
-		}
 		case T_SE:{
+			//Caso tenha um senão, a variável p3 recebe o irmão de p2
 			p1 = p->filho;	
 			p2 = p1->irmao;
 			if(p2->irmao != NULL)
@@ -249,42 +251,40 @@ void geraCod(ptno p){
 			
 			if(p3 != NULL){
 				geraCod(p3);
+				//Código referente ao DSVF
 				printf("\n\tbeqz $a0, L%d", ++ROTULO);
-				//pushrot(rot);
 				empilha(ROTULO);
 				geraCod(p2);
+				//Código referente ao DSVS
 				printf("\n\tj L%d", ++ROTULO);
+				//Código referente ao NADA
 				printf("\nL%d:\tnop", desempilha());
-				//pushrot(rot);
 				empilha(ROTULO);
 				geraCod(p1);
+				//Código referente ao NADA
 				printf("\nL%d:\tnop", desempilha());
 			}else{
 				geraCod(p2);
+				//Código referente ao DSVF
 				printf("\n\tbeqz $a0, L%d", ++ROTULO);
 				geraCod(p1);
+				//Código referente ao DSVS
 				printf("\n\tj L%d", ++ROTULO);
+				//Código referente ao NADA
 				printf("\nL%d:\tnop", desempilha());
 			}
-			break;
-		}
-		case T_ENTAO:{
-			p1 = p->filho;
-			geraCod(p1);
-			break;
-		}
-		case T_SENAO:{
-			p1 = p->filho;
-			geraCod(p1);
 			break;
 		}
 		case T_MENOR:{
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao CMME
 			printf("\n\tslt $a0, $t1, $a0");
 			break;
 		}
@@ -292,9 +292,12 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao CMMA
 			printf("\n\tslt $a0, $a0, $t1");
 			break;
 		}
@@ -302,9 +305,12 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao CMIG
 			printf("\n\tbeq $a0, $t1, L%d", ++ROTULO);
 			printf("\n\tli $a0, 0\n\tj L%d", ++ROTULO);
 			printf("\nL%d:\tli $a0, 1", --ROTULO);
@@ -314,6 +320,7 @@ void geraCod(ptno p){
 		case T_NAO:{
 			p1 = p->filho;
 			geraCod(p1);
+			//Código referente ao NEGA
 			printf("\n\tbeqz $a0 L%d", ++ROTULO);
 			printf("\n\tli $a0, 0\n\tj L%d", ++ROTULO);
 			printf("\nL%d:\tli $a0, 1", --ROTULO);
@@ -325,6 +332,7 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p1);
+			//Código referente ao ARZG
 			printf("\n\tsw $a0, %s", p2->valor);
 			break;
 		}
@@ -332,9 +340,12 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao SUBT
 			printf("\n\tsub $a0, $t1, $a0");
 			break;
 		}
@@ -342,9 +353,12 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao SOMA
 			printf("\n\tadd $a0 $t1 $a0");
 			break;
 		}
@@ -352,9 +366,12 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao MULT
 			printf("\n\tmultu $t1, $a0\n\tmflo $a0");
 			break;
 		}
@@ -362,18 +379,33 @@ void geraCod(ptno p){
 			p1 = p->filho;
 			p2 = p1->irmao;
 			geraCod(p2);
+			//Código referente ao EMPILHA
 			printf("\n\tsw $a0 0($sp)\n\taddiu $sp $sp -4");
 			geraCod(p1);
+			//Código referente ao DESEMPILHA
 			printf("\n\tlw $t1 4($sp)\n\taddiu $sp $sp 4");
+			//Código referente ao DIVI
 			printf("\n\tdivu $t1, $a0\n\tmflo $a0");
 			break;
 		}
 		case T_NUMERO:{
+			//Código referente ao CRCT
 			printf("\n\tli $a0 %s", p->valor);
 			break;
 		}
 		case T_VARIAVEL:{
+			//Código referente ao CRVG
 			printf("\n\tlw $a0 %s", p->valor);
+			break;
+		}
+		case T_V:{
+			//Código referente ao CRCT
+			printf("\n\tlw $a0 1");
+			break;
+		}
+		case T_F:{
+			//Código referente ao CRCT
+			printf("\n\tlw $a0 0");
 			break;
 		}
 		
@@ -383,28 +415,21 @@ void geraCod(ptno p){
 }
 
 void iniciaDot(ptno raiz){
-	
-	
-	
-	arq = fopen("graph.dot", "w");
-	//fprintf(arq, "%s\n", "digraph {");
+	//Escreve o cabeçalho do .dot
 	printf("digraph {\n");
-	//fprintf(arq, "%s\n", "node [shape=record, height = .1];");
 	printf("\tnode [shape=record, height = .1];\n");
 	push(raiz);
+	//Empilha a raiz e vai procurar os nós existentes para declarar
 	achaNos(raiz);
 	push(raiz);
 	ligacoes();
-	//fprintf(arq, "%s", "}");
 	printf("}");
-	fclose(arq);
 	
 }
 
+//Encontra e declara todos os nós
 void achaNos(){
 	ptno atual = pop();
-	//fprintf(arq, "\tn%p", atual);	
-	//fprintf(arq, " [label = \"%s | %s \"];\n", tabelaToken(atual->tipo), atual->valor);
 	if(tabelaToken(atual->tipo) != NULL){
 		printf("\tn%p", atual);
 		printf("[label = \"%s | %s \"];\n", tabelaToken(atual->tipo), atual->valor);
@@ -419,29 +444,15 @@ void achaNos(){
 	}
 }
 
+//Encontra e escreve as ligações entre os nós
 void ligacoes(){
 	ptno atual = pop();
 	ptno aux = atual->filho;
-	//if(aux == NULL){
-	//	if(!vazia()){
-	//		ligacoes(vo, pai);
-	//		return;
-	//	}
-	//}
-	//if(tabelaToken(atual->tipo) == NULL){
-	//	if(atual->irmao == pai){
-	//		atual = vo;
-	//	}else{
-	//		atual = pai;
-	//	}
-	//}
 	while(aux != NULL){
 		push(aux);
 		if(tabelaToken(aux->tipo) != NULL){
-			//fprintf(arq, "\tn%p -> ", atual);
-		printf("\tn%p -> ", atual);
-			//fprintf(arq, "n%p\n", aux);
-		printf("n%p\n", aux);		
+			printf("\tn%p -> ", atual);
+			printf("n%p\n", aux);		
 		}
 		aux = aux->irmao;
 	}
